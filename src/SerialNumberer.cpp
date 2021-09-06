@@ -10,11 +10,11 @@
 #include "../include/SerialNumberer.h"
 
 template<typename T>
-SerialNumberer<T>::SerialNumberer() : serialToItem_(), itemToSerial_(), itemCount_(0), overCount_(false) {
+SerialNumberer<T>::SerialNumberer() : serialToItem_(), itemToSerial_(), count_(0) {
 }
 
 template<typename T>
-SerialNumberer<T>::SerialNumberer(const SerialNumberer &rhs) : serialToItem_(rhs.serialToItem_), itemToSerial_(rhs.itemToSerial_), itemCount_(0), overCount_(rhs.overCount) {
+SerialNumberer<T>::SerialNumberer(const SerialNumberer &rhs) : serialToItem_(rhs.serialToItem_), itemToSerial_(rhs.itemToSerial_), count_(0){
 }
 
 template<typename T>
@@ -28,7 +28,7 @@ SerialNumberer<T> &SerialNumberer<T>::operator=(const SerialNumberer &rhs) {
 
 template<typename T>
 bool SerialNumberer<T>::operator==(const SerialNumberer &rhs) {
-    return this == &rhs || (serialToItem_ == rhs.serialToItem_ && itemToSerial_ == rhs.itemToSerial_);
+    return this == &rhs || serialToItem_ == rhs.serialToItem_;
 }
 
 template<typename T>
@@ -47,16 +47,15 @@ uint32_t SerialNumberer<T>::size() const noexcept {
 }
 
 template<typename T>
-bool SerialNumberer<T>::overSize() const noexcept {
-    return overCount_;
+uint32_t SerialNumberer<T>::hashCount() const noexcept {
+    return count_;
 }
 
 template<typename T>
 void SerialNumberer<T>::clear() noexcept {
     if (size() != 0) {
-        uint32_t cnt = itemCount_;
-        *this = SerialNumberer<T>();
-        itemCount_ = cnt;
+        SerialNumberer<T> ph;
+        *this = ph;
     }
 }
 
@@ -65,11 +64,11 @@ typename SerialNumberer<T>::serial SerialNumberer<T>::insert(T &item) {
     serial s;
     if (!contains(item)) {
         s = generateSerial(item);
-        serialToItem_.insert(std::pair<serial,T>(s,item));
-        itemToSerial_.insert(std::pair<T,serial>(item,s));
+        itemToSerial_.insert(std::pair<T*,serial>(&item,s));
+        serialToItem_.insert(std::pair<serial,T*>(s,&item));
     }
     else {
-        s = itemToSerial_.at(item);
+        s = getSerial(item).first;
     }
     return s;
 }
@@ -82,13 +81,8 @@ typename SerialNumberer<T>::serial SerialNumberer<T>::insert(T &&item) {
 template<typename T>
 void SerialNumberer<T>::erase(T &item) {
     serial s(itemToSerial_.at(item));
-    itemToSerial_.erase(item);
+    itemToSerial_.erase(&item);
     serialToItem_.erase(s);
-}
-
-template<typename T>
-void SerialNumberer<T>::erase(T &&item) {
-    erase(item);
 }
 
 template<typename T>
@@ -99,40 +93,46 @@ void SerialNumberer<T>::erase(SerialNumberer::serial s) {
 
 template<typename T>
 bool SerialNumberer<T>::contains(const T &item) const {
-    return itemToSerial_.contains(item);
+    return itemToSerial_.contains(&(const_cast<T&>(item))); // i legit have no clue
 }
 
 template<typename T>
 bool SerialNumberer<T>::contains(const SerialNumberer::serial s) const {
-    return contains(serialToItem_.at(s));
+    return serialToItem_.contains(s);
 }
 
 template<typename T>
-std::pair<typename SerialNumberer<T>::serial,bool> SerialNumberer<T>::getSerial(const T &item) const {
-    return (itemToSerial_.contains(item)) ?
-        std::pair<typename SerialNumberer<T>::serial,bool>(itemToSerial_.at(item),true) :
+std::pair<typename SerialNumberer<T>::serial,bool> SerialNumberer<T>::getSerial(T &item) const {
+    return (contains(item)) ?
+        std::pair<typename SerialNumberer<T>::serial,bool>(itemToSerial_.at(&item),true) :
         std::pair<typename SerialNumberer<T>::serial,bool>(typename SerialNumberer<T>::serial(),false);
 }
 
 template<typename T>
-std::pair<T&,bool> SerialNumberer<T>::getItem(const SerialNumberer::serial s) {
+std::pair<typename SerialNumberer<T>::serial, bool> SerialNumberer<T>::operator[](const T &item) const {
+    return getSerial(item);
+}
+
+template<typename T>
+std::pair<const T*,bool> SerialNumberer<T>::getItem(const SerialNumberer::serial s) {
     return (serialToItem_.contains(s)) ?
-        std::pair<T&,bool>(serialToItem_.at(s),true) :
-        std::pair<T&,bool>(T(),false);
+        std::pair<const T*,bool>(serialToItem_.at(s),true) :
+        std::pair<const T*,bool>(nullptr, false);
+}
+
+template<typename T>
+std::pair<const T*,bool> SerialNumberer<T>::operator[](const SerialNumberer::serial s) {
+    return getItem(s);
 }
 
 template<typename T>
 typename SerialNumberer<T>::serial SerialNumberer<T>::generateSerial(const T& item) {
-    std::ostringstream s;
-    size_t hsh(std::hash<T>{}(item));
-    s << std::hex << itemCount_ << "-";
-    s << std::hex << hsh;
-
-    if (itemCount_ == 4294967296)
-        overCount_ = true;
-
-    ++itemCount_;
-    return s.str();
+    ++count_;
+    if (count_ == 0)
+        throw std::logic_error("too many inserts, reverted count_ to zero");
+    std::stringstream stream;
+    stream << std::hex << count_;
+    return stream.str();
 }
 
 #endif // SERIALNUMBERER_SERIALNUMBERER_CPP

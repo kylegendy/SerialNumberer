@@ -6,13 +6,23 @@
 #define SERIALNUMBERER_SERIALNUMBERER_H
 
 #include <unordered_map>
+#include <map>
 #include <string>
+
+template <typename T>
+struct RefHash {
+    std::size_t operator()(T* ptr) const {
+        if (ptr == nullptr)
+            throw std::logic_error("null at address");
+        return (std::size_t)(&(*ptr));
+    }
+};
 
 template <typename T>
 class SerialNumberer {
 
     using serial = std::string;
-    using Cont = std::unordered_map<std::string,T>;
+    using Cont = std::unordered_map<serial,T*>;
 
 public:
 
@@ -48,15 +58,15 @@ public:
     uint32_t size() const noexcept;
 
     /**
-     * @return true if over max count of uint32_t, else false
+     * @return the number of times serial numbers were created
      */
-    bool overSize() const noexcept;
+    uint32_t hashCount() const noexcept;
 
 //////////////////////////////////////////////////////
 //// MODIFIERS
 
     /**
-     * replaces *this with a def ctor instance, maintaining itemCount_ for persistent randomized serialization
+     * replaces *this with a def ctor instance, maintaining count_ for persistent randomized serialization
      */
     void clear() noexcept;
 
@@ -73,7 +83,6 @@ public:
      * @param item - the item being deleted
      */
     void erase(T& item);
-    void erase(T&& item);
 
     /**
      * deletes serial number and corresponding item if present
@@ -103,24 +112,24 @@ public:
      * @param item - the item being searched for
      * @return pair of serial and bool, bool true if valid else false
      */
-    std::pair<serial,bool> getSerial(const T& item) const;
+    std::pair<serial,bool> getSerial(T& item) const;
+    std::pair<serial,bool> operator[](const T& item) const;
 
     /**
      * finds the item at the given serial number if present
      * @param s - the serial number being searched for
      * @return pair of item and bool, bool true if valid else false
      */
-    std::pair<T&,bool> getItem(const serial s);
+    std::pair<const T*,bool> getItem(const serial s);
+    std::pair<const T*,bool> operator[](const serial s);
 
 private:
 
     Cont serialToItem_;
 
-    std::unordered_map<T,serial> itemToSerial_;
+    std::unordered_map<T*,serial,RefHash<T>> itemToSerial_;
 
-    uint32_t itemCount_;
-
-    bool overCount_;
+    uint32_t count_;
 
     serial generateSerial(const T& item);
 
