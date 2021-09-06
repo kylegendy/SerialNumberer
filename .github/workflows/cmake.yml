@@ -1,5 +1,5 @@
 name: Build and Run Automated Tests
-
+# This workflow is triggered on pushes to the repository.
 on:
   push:
     branches: 
@@ -37,18 +37,18 @@ jobs:
       - name: Run.
         run: docker exec -t build bash -c "cd /repo/bin && ./testing"
       
-    linter:
-      name: linter
-      runs-on: ubuntu-latest
-      steps:
-        - uses: actions/checkout@v1
-        - name: Setup the container.
-          run: docker pull nashtrash/isd-base
-        - name: Start the container.
-          run: docker run -itd --name build nashtrash/isd-base
-        - name: Copy repo and deps over.
-          run: docker cp . build:/repo
-        - name: Set run permissions
-          run: chmod +x .github/workflows/linter.sh
-        - name: Run the linter
-          run: .github/workflows/linter.sh
+  linter:
+    name: linter
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - name: Setup the container.
+        run: docker pull nashtrash/isd-base
+      - name: Start the container.
+        run: docker run -itd --name build nashtrash/isd-base
+      - name: Copy repo and deps over.
+        run: docker cp . build:/repo
+      - name: Set run permissions
+        run: chmod +x .github/workflows/linter.sh
+      - name: Run the linter
+        run: .github/workflows/linter.sh
